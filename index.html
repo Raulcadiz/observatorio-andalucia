@@ -3,11 +3,14 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Observatorio Andaluz de Transparencia Democrática - OATD</title>
-    <meta name="description" content="Plataforma ciudadana de análisis y seguimiento de la transparencia en la gestión de fondos públicos en Andalucía">
+    <title>Observatorio Andaluz de Transparencia Democrática - Datos Reales</title>
     <script src="https://cdn.jsdelivr.net/npm/@tailwindcss/browser@4"></script>
     <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
     <style>
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap');
+        
         :root {
             --color-primary: #005baa;
             --color-accent: #c00;
@@ -16,244 +19,196 @@
             --color-light: #f0f8ff;
         }
         
+        * {
+            font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+        }
+        
         body {
-            font-family: 'Segoe UI', system-ui, -apple-system, sans-serif;
-            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            background: linear-gradient(135deg, #1e3a8a 0%, #7c3aed 100%);
             min-height: 100vh;
         }
         
         .glass-effect {
-            background: rgba(255, 255, 255, 0.95);
-            backdrop-filter: blur(10px);
-            border: 1px solid rgba(255, 255, 255, 0.3);
+            background: rgba(255, 255, 255, 0.98);
+            backdrop-filter: blur(15px);
+            border: 1px solid rgba(255, 255, 255, 0.4);
+            box-shadow: 0 8px 32px rgba(0, 0, 0, 0.1);
         }
         
         .stat-card {
-            transition: all 0.3s ease;
+            transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
             cursor: pointer;
+            position: relative;
+            overflow: hidden;
+        }
+        
+        .stat-card::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: -100%;
+            width: 100%;
+            height: 100%;
+            background: linear-gradient(90deg, transparent, rgba(255,255,255,0.2), transparent);
+            transition: left 0.5s;
+        }
+        
+        .stat-card:hover::before {
+            left: 100%;
         }
         
         .stat-card:hover {
-            transform: translateY(-5px);
-            box-shadow: 0 20px 40px rgba(0, 0, 0, 0.15);
+            transform: translateY(-8px);
+            box-shadow: 0 25px 50px rgba(0, 0, 0, 0.2);
         }
         
         .province-card {
             transition: all 0.3s ease;
             border-left: 4px solid transparent;
+            position: relative;
         }
         
         .province-card:hover {
             border-left-color: var(--color-primary);
-            background-color: #f8f9fa;
+            background: linear-gradient(90deg, #f8f9fa 0%, white 100%);
         }
         
         .alert-badge {
-            animation: pulse 2s infinite;
+            animation: pulse 2s cubic-bezier(0.4, 0, 0.6, 1) infinite;
         }
         
         @keyframes pulse {
-            0%, 100% { opacity: 1; }
-            50% { opacity: 0.6; }
-        }
-        
-        .timeline-item::before {
-            content: '';
-            position: absolute;
-            left: -8px;
-            top: 0;
-            width: 16px;
-            height: 16px;
-            border-radius: 50%;
-            background: var(--color-primary);
-            border: 3px solid white;
-        }
-        
-        .chart-container {
-            position: relative;
-            height: 400px;
-            margin: 20px 0;
+            0%, 100% { opacity: 1; transform: scale(1); }
+            50% { opacity: 0.8; transform: scale(1.05); }
         }
         
         .tab-button {
             transition: all 0.3s ease;
             border-bottom: 3px solid transparent;
+            position: relative;
         }
         
         .tab-button.active {
             border-bottom-color: var(--color-primary);
             color: var(--color-primary);
-            font-weight: 600;
+            font-weight: 700;
         }
         
         .scrollspy-nav {
             position: sticky;
             top: 20px;
-        }
-        
-        .progress-ring {
-            transform: rotate(-90deg);
+            max-height: 90vh;
+            overflow-y: auto;
         }
         
         .impact-badge {
             display: inline-block;
-            padding: 4px 12px;
+            padding: 6px 14px;
             border-radius: 20px;
-            font-size: 0.85em;
-            font-weight: 600;
+            font-size: 0.8em;
+            font-weight: 700;
+            letter-spacing: 0.5px;
         }
         
-        .impact-critical { background: #ffebee; color: #c62828; }
-        .impact-high { background: #fff3e0; color: #e65100; }
-        .impact-medium { background: #fff8e1; color: #f57f17; }
-        .impact-low { background: #e8f5e9; color: #2e7d32; }
+        .impact-critical { background: #ffebee; color: #c62828; border: 1px solid #ef9a9a; }
+        .impact-high { background: #fff3e0; color: #e65100; border: 1px solid #ffcc80; }
+        .impact-medium { background: #fff8e1; color: #f57f17; border: 1px solid #ffecb3; }
+        .impact-low { background: #e8f5e9; color: #2e7d32; border: 1px solid #a5d6a7; }
         
-        .search-input {
-            transition: all 0.3s ease;
-        }
-        
-        .search-input:focus {
-            box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.1);
-        }
-        
-        .tooltip {
+        .chart-container {
             position: relative;
-            cursor: help;
+            height: 450px;
+            margin: 25px 0;
         }
         
-        .tooltip:hover::after {
-            content: attr(data-tooltip);
-            position: absolute;
-            bottom: 100%;
-            left: 50%;
-            transform: translateX(-50%);
-            padding: 8px 12px;
-            background: rgba(0,0,0,0.9);
-            color: white;
-            border-radius: 6px;
-            font-size: 0.75rem;
-            white-space: nowrap;
-            z-index: 1000;
-        }
-        
-        .case-card {
+        .search-box {
             transition: all 0.3s ease;
-            cursor: pointer;
         }
         
-        .case-card:hover {
-            transform: translateX(5px);
-            border-left-width: 6px;
+        .search-box:focus {
+            transform: scale(1.02);
+            box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.3);
+        }
+        
+        .data-table {
+            max-height: 400px;
+            overflow-y: auto;
+        }
+        
+        .municipality-row {
+            transition: all 0.2s ease;
+        }
+        
+        .municipality-row:hover {
+            background-color: #f3f4f6;
+            transform: translateX(4px);
+        }
+        
+        #map {
+            height: 500px;
+            border-radius: 12px;
+            overflow: hidden;
+        }
+        
+        .progress-bar {
+            transition: width 0.8s ease;
         }
         
         .modal {
             display: none;
             position: fixed;
-            z-index: 9999;
-            left: 0;
             top: 0;
+            left: 0;
             width: 100%;
             height: 100%;
-            overflow: auto;
-            background-color: rgba(0,0,0,0.7);
-            backdrop-filter: blur(5px);
+            background: rgba(0, 0, 0, 0.7);
+            z-index: 1000;
         }
         
-        .modal-content {
-            background-color: #fefefe;
-            margin: 5% auto;
-            padding: 30px;
-            border-radius: 15px;
-            width: 90%;
-            max-width: 800px;
-            box-shadow: 0 20px 60px rgba(0,0,0,0.3);
-        }
-        
-        .close {
-            color: #aaa;
-            float: right;
-            font-size: 28px;
-            font-weight: bold;
-            cursor: pointer;
-            transition: color 0.3s;
-        }
-        
-        .close:hover,
-        .close:focus {
-            color: #000;
-        }
-        
-        .methodology-step {
-            position: relative;
-            padding-left: 50px;
-            margin-bottom: 30px;
-        }
-        
-        .methodology-step::before {
-            content: attr(data-step);
-            position: absolute;
-            left: 0;
-            top: 0;
-            width: 36px;
-            height: 36px;
-            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-            color: white;
-            border-radius: 50%;
+        .modal.active {
             display: flex;
             align-items: center;
             justify-content: center;
-            font-weight: bold;
         }
         
-        .data-source {
-            border-left: 3px solid #3b82f6;
-            padding-left: 15px;
-            margin: 10px 0;
-            background: #eff6ff;
-            padding: 12px 15px;
-            border-radius: 0 8px 8px 0;
+        .modal-content {
+            background: white;
+            border-radius: 16px;
+            padding: 32px;
+            max-width: 600px;
+            max-height: 80vh;
+            overflow-y: auto;
+            transform: scale(0.9);
+            transition: transform 0.3s ease;
         }
         
-        .ranking-row {
-            transition: all 0.2s;
-        }
-        
-        .ranking-row:hover {
-            background: #f8fafc;
-            transform: scale(1.01);
+        .modal.active .modal-content {
+            transform: scale(1);
         }
     </style>
 </head>
 <body>
     <!-- Header -->
     <header class="glass-effect shadow-lg sticky top-0 z-50">
-        <div class="container mx-auto px-4 py-4">
+        <div class="container mx-auto px-6 py-5">
             <div class="flex items-center justify-between">
                 <div class="flex items-center space-x-4">
-                    <div class="w-12 h-12 bg-gradient-to-br from-blue-600 to-purple-600 rounded-lg flex items-center justify-center text-white text-2xl font-bold">
+                    <div class="w-14 h-14 bg-gradient-to-br from-blue-600 to-purple-600 rounded-xl flex items-center justify-center text-white text-2xl font-bold shadow-lg">
                         OA
                     </div>
                     <div>
-                        <h1 class="text-2xl font-bold text-gray-800">Observatorio Andaluz de Transparencia</h1>
-                        <p class="text-sm text-gray-600">Sistema de Monitoreo Democrático </p>
+                        <h1 class="text-3xl font-bold text-gray-800 tracking-tight">Observatorio Andaluz de Transparencia</h1>
+                        <p class="text-sm text-gray-600 font-medium">Sistema de Monitoreo Democrático · Datos Actualizados 2024</p>
                     </div>
                 </div>
-                <div class="flex items-center space-x-3">
-                    <button onclick="openModal('contactModal')" class="bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 transition text-sm font-semibold">
-                        📧 Contactar
+                <div class="flex items-center space-x-4">
+                    <div class="alert-badge bg-red-100 text-red-700 px-5 py-2 rounded-full font-bold shadow-md flex items-center space-x-2">
+                        <span class="text-lg">🚨</span>
+                        <span>2847 Irregularidades Documentadas</span>
+                    </div>
+                    <button onclick="openReportModal()" class="bg-blue-600 text-white px-5 py-2 rounded-lg hover:bg-blue-700 transition font-semibold shadow-md">
+                        📢 Reportar
                     </button>
-                    <button onclick="openModal('reportModal')" class="alert-badge bg-red-100 text-red-700 px-4 py-2 rounded-lg font-semibold cursor-pointer hover:bg-red-200 transition">
-                        🚨 Reportar Irregularidad
-                    </button>
-                </div>
-            </div>
-            
-            <!-- Barra de búsqueda global -->
-            <div class="mt-4">
-                <div class="relative">
-                    <input type="text" id="globalSearch" placeholder="🔍 Buscar municipio, contrato, empresa..." 
-                           class="search-input w-full px-4 py-3 pl-12 rounded-lg border-2 border-gray-200 focus:border-blue-500 focus:outline-none">
-                    <span class="absolute left-4 top-3.5 text-gray-400 text-xl">🔍</span>
                 </div>
             </div>
         </div>
@@ -267,16 +222,9 @@
                     <h3 class="font-bold text-gray-800 mb-4">Navegación</h3>
                     <ul class="space-y-2">
                         <li><a href="#resumen" class="block py-2 px-3 rounded hover:bg-blue-50 transition">📊 Resumen Ejecutivo</a></li>
-                        <li><a href="#metodologia" class="block py-2 px-3 rounded hover:bg-blue-50 transition">🔬 Metodología</a></li>
-                        <li><a href="#casos" class="block py-2 px-3 rounded hover:bg-blue-50 transition">📋 Casos Documentados</a></li>
-                        <li><a href="#ranking" class="block py-2 px-3 rounded hover:bg-blue-50 transition">🏆 Ranking Municipios</a></li>
-                        <li><a href="#empresas" class="block py-2 px-3 rounded hover:bg-blue-50 transition">🏢 Empresas Adjudicatarias</a></li>
                         <li><a href="#provincias" class="block py-2 px-3 rounded hover:bg-blue-50 transition">🗺️ Análisis Provincial</a></li>
                         <li><a href="#irregularidades" class="block py-2 px-3 rounded hover:bg-blue-50 transition">🚨 Irregularidades</a></li>
-                        <li><a href="#buscador" class="block py-2 px-3 rounded hover:bg-blue-50 transition">🔍 Buscador Contratos</a></li>
-                        <li><a href="#calculadora" class="block py-2 px-3 rounded hover:bg-blue-50 transition">🧮 Calculadora</a></li>
                         <li><a href="#acciones" class="block py-2 px-3 rounded hover:bg-blue-50 transition">⚖️ Acciones Legales</a></li>
-                        <li><a href="#herramientas" class="block py-2 px-3 rounded hover:bg-blue-50 transition">🛠️ Herramientas</a></li>
                         <li><a href="#ciudadania" class="block py-2 px-3 rounded hover:bg-blue-50 transition">✊ Participación</a></li>
                         <li><a href="#tecnologia" class="block py-2 px-3 rounded hover:bg-blue-50 transition">🛡️ Tecnología</a></li>
                     </ul>
@@ -329,547 +277,6 @@
                     <div class="chart-container bg-white rounded-lg p-4 shadow">
                         <h3 class="font-semibold text-gray-700 mb-4">Evolución de Irregularidades por Año</h3>
                         <canvas id="trendChart"></canvas>
-                    </div>
-                </section>
-
-                <!-- Metodología -->
-                <section id="metodologia" class="glass-effect rounded-xl p-8 shadow-lg">
-                    <h2 class="text-3xl font-bold text-gray-800 mb-6">🔬 Metodología de Análisis</h2>
-                    
-                    <div class="bg-blue-50 border-l-4 border-blue-600 p-6 rounded mb-6">
-                        <p class="text-gray-700 mb-2"><strong>Periodo analizado:</strong> Enero 2019 - Diciembre 2024</p>
-                        <p class="text-gray-700 mb-2"><strong>Municipios:</strong> 312 de 786 (39.7% de Andalucía)</p>
-                        <p class="text-gray-700"><strong>Contratos analizados:</strong> 48,567 expedientes</p>
-                    </div>
-
-                    <div class="space-y-6">
-                        <div class="methodology-step" data-step="1">
-                            <h3 class="text-xl font-bold text-gray-800 mb-3">Recopilación de Datos</h3>
-                            <div class="space-y-3">
-                                <div class="data-source">
-                                    <strong>🌐 Plataforma de Contratación del Estado</strong>
-                                    <p class="text-sm text-gray-600">Contratos publicados según LCSP (Ley 9/2017)</p>
-                                    <a href="https://contrataciondelestado.es" target="_blank" class="text-blue-600 text-xs hover:underline">→ Acceder a la plataforma</a>
-                                </div>
-                                <div class="data-source">
-                                    <strong>📊 Portal de Transparencia de Andalucía</strong>
-                                    <p class="text-sm text-gray-600">Datos presupuestarios y económicos municipales</p>
-                                    <a href="https://juntadeandalucia.es/transparencia" target="_blank" class="text-blue-600 text-xs hover:underline">→ Portal oficial</a>
-                                </div>
-                                <div class="data-source">
-                                    <strong>⚖️ Tribunal de Cuentas & Cámara de Cuentas de Andalucía</strong>
-                                    <p class="text-sm text-gray-600">Informes de fiscalización 2019-2023</p>
-                                    <a href="https://www.ccuentas.es" target="_blank" class="text-blue-600 text-xs hover:underline">→ Informes públicos</a>
-                                </div>
-                                <div class="data-source">
-                                    <strong>📰 BOJA y BOE</strong>
-                                    <p class="text-sm text-gray-600">Publicaciones oficiales de adjudicaciones</p>
-                                </div>
-                            </div>
-                        </div>
-
-                        <div class="methodology-step" data-step="2">
-                            <h3 class="text-xl font-bold text-gray-800 mb-3">Análisis Automatizado</h3>
-                            <p class="text-gray-700 mb-3">Sistema de detección de anomalías basado en:</p>
-                            <ul class="space-y-2 text-gray-600">
-                                <li class="flex items-start space-x-2">
-                                    <span class="text-blue-600 font-bold">•</span>
-                                    <span><strong>Análisis de plazos:</strong> Identificación de contratos con menos de 5 días hábiles entre publicación y adjudicación</span>
-                                </li>
-                                <li class="flex items-start space-x-2">
-                                    <span class="text-blue-600 font-bold">•</span>
-                                    <span><strong>Comparativa de precios:</strong> Desviaciones >20% respecto a media del sector</span>
-                                </li>
-                                <li class="flex items-start space-x-2">
-                                    <span class="text-blue-600 font-bold">•</span>
-                                    <span><strong>Recurrencia de adjudicatarios:</strong> Empresas con >70% de adjudicaciones en un municipio</span>
-                                </li>
-                                <li class="flex items-start space-x-2">
-                                    <span class="text-blue-600 font-bold">•</span>
-                                    <span><strong>Fraccionamiento irregular:</strong> Múltiples contratos menores para eludir licitación pública</span>
-                                </li>
-                            </ul>
-                        </div>
-
-                        <div class="methodology-step" data-step="3">
-                            <h3 class="text-xl font-bold text-gray-800 mb-3">Verificación Manual</h3>
-                            <p class="text-gray-700">Cada caso señalado es revisado por equipo de 12 analistas especializados en derecho administrativo y auditoría pública.</p>
-                        </div>
-
-                        <div class="methodology-step" data-step="4">
-                            <h3 class="text-xl font-bold text-gray-800 mb-3">Contraste con Fuentes Oficiales</h3>
-                            <p class="text-gray-700">Validación cruzada con informes del Defensor del Pueblo Andaluz, denuncias ciudadanas y resoluciones judiciales.</p>
-                        </div>
-                    </div>
-
-                    <div class="mt-8 bg-yellow-50 border border-yellow-300 rounded-lg p-6">
-                        <h4 class="font-bold text-gray-800 mb-2">🎓 Colaboraciones Académicas</h4>
-                        <p class="text-sm text-gray-700 mb-3">Este observatorio cuenta con el asesoramiento de:</p>
-                        <ul class="text-sm text-gray-600 space-y-1">
-                            <li>• Universidad de Sevilla - Dpto. Derecho Administrativo</li>
-                            <li>• Universidad de Málaga - Facultad de Ciencias Económicas</li>
-                            <li>• Transparency International España</li>
-                        </ul>
-                    </div>
-                </section>
-
-                <!-- Casos Documentados -->
-                <section id="casos" class="glass-effect rounded-xl p-8 shadow-lg">
-                    <h2 class="text-3xl font-bold text-gray-800 mb-6">📋 Casos Emblemáticos Documentados</h2>
-                    
-                    <div class="mb-6">
-                        <p class="text-gray-600 mb-4">Selección de casos con máxima gravedad e impacto público detectados en el análisis 2019-2024</p>
-                        
-                        <div class="flex gap-2 mb-4">
-                            <button onclick="filterCases('all')" class="px-4 py-2 bg-gray-200 rounded-lg hover:bg-gray-300 transition text-sm font-semibold" id="filter-all">Todos</button>
-                            <button onclick="filterCases('critical')" class="px-4 py-2 bg-gray-200 rounded-lg hover:bg-gray-300 transition text-sm" id="filter-critical">Críticos</button>
-                            <button onclick="filterCases('judicial')" class="px-4 py-2 bg-gray-200 rounded-lg hover:bg-gray-300 transition text-sm" id="filter-judicial">En vía judicial</button>
-                            <button onclick="filterCases('resolved')" class="px-4 py-2 bg-gray-200 rounded-lg hover:bg-gray-300 transition text-sm" id="filter-resolved">Resueltos</button>
-                        </div>
-                    </div>
-
-                    <div class="space-y-4" id="casesContainer">
-                        <!-- Caso 1 -->
-                        <div class="case-card border-l-4 border-red-600 bg-white rounded-lg p-6 shadow hover:shadow-lg" data-category="critical judicial">
-                            <div class="flex justify-between items-start mb-3">
-                                <div>
-                                    <span class="impact-badge impact-critical">CRÍTICO</span>
-                                    <span class="ml-2 text-xs bg-purple-100 text-purple-700 px-3 py-1 rounded-full font-semibold">EN FISCALÍA</span>
-                                </div>
-                                <span class="text-sm text-gray-500">Exp. #2024-SEV-487</span>
-                            </div>
-                            <h3 class="text-xl font-bold text-gray-800 mb-2">Contratación sin licitación - Sevilla Capital</h3>
-                            <div class="grid md:grid-cols-3 gap-4 mb-4">
-                                <div>
-                                    <div class="text-2xl font-bold text-red-600">€2.8M</div>
-                                    <div class="text-xs text-gray-600">Cuantía irregular</div>
-                                </div>
-                                <div>
-                                    <div class="text-lg font-bold text-gray-700">35 contratos</div>
-                                    <div class="text-xs text-gray-600">Fraccionados ilegalmente</div>
-                                </div>
-                                <div>
-                                    <div class="text-lg font-bold text-gray-700">2022-2023</div>
-                                    <div class="text-xs text-gray-600">Periodo</div>
-                                </div>
-                            </div>
-                            <div class="bg-gray-50 rounded p-4 mb-3">
-                                <p class="text-sm text-gray-700 mb-2"><strong>Descripción:</strong> Servicios de consultoría adjudicados mediante fraccionamiento sistemático a la misma empresa (Consultora XYZ S.L.) para eludir procedimiento abierto. Total de 35 contratos menores entre 14.500€ y 14.999€.</p>
-                                <p class="text-sm text-gray-700"><strong>Marco legal vulnerado:</strong> Art. 118 LCSP (prohibición de fraccionamiento), Art. 63 LCSP (procedimientos según cuantía)</p>
-                            </div>
-                            <div class="flex items-center justify-between">
-                                <div class="text-xs text-gray-600">
-                                    <strong>Fuente:</strong> Informe Intervención Municipal SEV-2023-089 | <a href="#" class="text-blue-600 hover:underline">BOJA 23/03/2024</a>
-                                </div>
-                                <button onclick="openCaseDetail(1)" class="text-blue-600 hover:text-blue-800 font-semibold text-sm">Ver detalles →</button>
-                            </div>
-                        </div>
-
-                        <!-- Caso 2 -->
-                        <div class="case-card border-l-4 border-orange-600 bg-white rounded-lg p-6 shadow hover:shadow-lg" data-category="critical">
-                            <div class="flex justify-between items-start mb-3">
-                                <div>
-                                    <span class="impact-badge impact-high">ALTO</span>
-                                    <span class="ml-2 text-xs bg-blue-100 text-blue-700 px-3 py-1 rounded-full font-semibold">TRIBUNAL CUENTAS</span>
-                                </div>
-                                <span class="text-sm text-gray-500">Exp. #2023-CAD-312</span>
-                            </div>
-                            <h3 class="text-xl font-bold text-gray-800 mb-2">Sobrecostes en obra pública - Cádiz</h3>
-                            <div class="grid md:grid-cols-3 gap-4 mb-4">
-                                <div>
-                                    <div class="text-2xl font-bold text-orange-600">€1.2M</div>
-                                    <div class="text-xs text-gray-600">Sobrecoste detectado</div>
-                                </div>
-                                <div>
-                                    <div class="text-lg font-bold text-gray-700">+87%</div>
-                                    <div class="text-xs text-gray-600">Incremento s/inicial</div>
-                                </div>
-                                <div>
-                                    <div class="text-lg font-bold text-gray-700">2021-2023</div>
-                                    <div class="text-xs text-gray-600">Ejecución</div>
-                                </div>
-                            </div>
-                            <div class="bg-gray-50 rounded p-4 mb-3">
-                                <p class="text-sm text-gray-700 mb-2"><strong>Descripción:</strong> Rehabilitación del Paseo Marítimo adjudicada por €1.4M, finalizada en €2.6M tras 12 modificados. Sin justificación técnica adecuada de las variaciones.</p>
-                                <p class="text-sm text-gray-700"><strong>Marco legal vulnerado:</strong> Art. 205 LCSP (límites modificados), Art. 242 LCSP (proyecto y replanteo previo)</p>
-                            </div>
-                            <div class="flex items-center justify-between">
-                                <div class="text-xs text-gray-600">
-                                    <strong>Fuente:</strong> Informe Cámara Cuentas Andalucía IF-2024/08
-                                </div>
-                                <button onclick="openCaseDetail(2)" class="text-blue-600 hover:text-blue-800 font-semibold text-sm">Ver detalles →</button>
-                            </div>
-                        </div>
-
-                        <!-- Caso 3 -->
-                        <div class="case-card border-l-4 border-green-600 bg-white rounded-lg p-6 shadow hover:shadow-lg" data-category="resolved">
-                            <div class="flex justify-between items-start mb-3">
-                                <div>
-                                    <span class="impact-badge impact-medium">MEDIO</span>
-                                    <span class="ml-2 text-xs bg-green-100 text-green-700 px-3 py-1 rounded-full font-semibold">RESUELTO</span>
-                                </div>
-                                <span class="text-sm text-gray-500">Exp. #2022-MAL-156</span>
-                            </div>
-                            <h3 class="text-xl font-bold text-gray-800 mb-2">Contratación de personal eventual - Málaga</h3>
-                            <div class="grid md:grid-cols-3 gap-4 mb-4">
-                                <div>
-                                    <div class="text-2xl font-bold text-green-600">€450K</div>
-                                    <div class="text-xs text-gray-600">Reintegrado</div>
-                                </div>
-                                <div>
-                                    <div class="text-lg font-bold text-gray-700">23 personas</div>
-                                    <div class="text-xs text-gray-600">Sin plaza presup.</div>
-                                </div>
-                                <div>
-                                    <div class="text-lg font-bold text-gray-700">2020-2022</div>
-                                    <div class="text-xs text-gray-600">Periodo</div>
-                                </div>
-                            </div>
-                            <div class="bg-gray-50 rounded p-4 mb-3">
-                                <p class="text-sm text-gray-700 mb-2"><strong>Descripción:</strong> Contratación de personal eventual sin cobertura presupuestaria ni procedimiento de selección conforme a principios de mérito y capacidad.</p>
-                                <p class="text-sm text-gray-700 mb-2"><strong>Resolución:</strong> Sentencia TSJA 2024 ordenó reintegro completo más intereses. Expediente disciplinario a 3 responsables.</p>
-                                <p class="text-sm text-gray-700"><strong>Marco legal vulnerado:</strong> Art. 23.2 CE (acceso función pública), EBEP Art. 55</p>
-                            </div>
-                            <div class="flex items-center justify-between">
-                                <div class="text-xs text-gray-600">
-                                    <strong>Fuente:</strong> Sentencia TSJA 234/2024 | BOE-A-2024-5678
-                                </div>
-                                <button onclick="openCaseDetail(3)" class="text-blue-600 hover:text-blue-800 font-semibold text-sm">Ver detalles →</button>
-                            </div>
-                        </div>
-
-                        <!-- Caso 4 -->
-                        <div class="case-card border-l-4 border-red-600 bg-white rounded-lg p-6 shadow hover:shadow-lg" data-category="critical judicial">
-                            <div class="flex justify-between items-start mb-3">
-                                <div>
-                                    <span class="impact-badge impact-critical">CRÍTICO</span>
-                                    <span class="ml-2 text-xs bg-red-100 text-red-700 px-3 py-1 rounded-full font-semibold">JUZGADO INSTRUCCIÓN</span>
-                                </div>
-                                <span class="text-sm text-gray-500">Exp. #2024-GRA-089</span>
-                            </div>
-                            <h3 class="text-xl font-bold text-gray-800 mb-2">Subvenciones irregulares - Granada</h3>
-                            <div class="grid md:grid-cols-3 gap-4 mb-4">
-                                <div>
-                                    <div class="text-2xl font-bold text-red-600">€890K</div>
-                                    <div class="text-xs text-gray-600">Fondos desviados</div>
-                                </div>
-                                <div>
-                                    <div class="text-lg font-bold text-gray-700">17 asociaciones</div>
-                                    <div class="text-xs text-gray-600">Beneficiarias ficticias</div>
-                                </div>
-                                <div>
-                                    <div class="text-lg font-bold text-gray-700">2019-2022</div>
-                                    <div class="text-xs text-gray-600">Periodo</div>
-                                </div>
-                            </div>
-                            <div class="bg-gray-50 rounded p-4 mb-3">
-                                <p class="text-sm text-gray-700 mb-2"><strong>Descripción:</strong> Concesión de subvenciones a asociaciones culturales sin actividad probada. Justificaciones con facturas falsas. Investigación por delito continuado de malversación.</p>
-                                <p class="text-sm text-gray-700"><strong>Marco legal vulnerado:</strong> Art. 432 CP (malversación), Ley 38/2003 Art. 37 (justificación subvenciones)</p>
-                            </div>
-                            <div class="flex items-center justify-between">
-                                <div class="text-xs text-gray-600">
-                                    <strong>Fuente:</strong> Diligencias Previas 1234/2024 Juzgado Instrucción nº3 Granada
-                                </div>
-                                <button onclick="openCaseDetail(4)" class="text-blue-600 hover:text-blue-800 font-semibold text-sm">Ver detalles →</button>
-                            </div>
-                        </div>
-                    </div>
-
-                    <div class="mt-6 text-center">
-                        <button onclick="loadMoreCases()" class="bg-blue-600 text-white px-6 py-3 rounded-lg hover:bg-blue-700 transition font-semibold">
-                            Cargar más casos (127 disponibles)
-                        </button>
-                    </div>
-                </section>
-
-                <!-- Ranking de Municipios -->
-                <section id="ranking" class="glass-effect rounded-xl p-8 shadow-lg">
-                    <h2 class="text-3xl font-bold text-gray-800 mb-6">🏆 Ranking de Transparencia Municipal</h2>
-                    
-                    <div class="mb-6 bg-blue-50 border-l-4 border-blue-600 p-4 rounded">
-                        <p class="text-sm text-gray-700"><strong>Índice de Transparencia Pública (ITP):</strong> Métrica compuesta que evalúa publicidad de contratos (40%), cumplimiento plazos (25%), información presupuestaria (20%) y accesibilidad ciudadana (15%). Escala 0-100.</p>
-                    </div>
-
-                    <div class="grid md:grid-cols-2 gap-6">
-                        <!-- Top 10 Mejores -->
-                        <div class="bg-white rounded-lg p-6 border-2 border-green-200">
-                            <h3 class="text-xl font-bold text-green-700 mb-4">✅ Top 10 - Mayor Transparencia</h3>
-                            <div class="space-y-2">
-                                <div class="ranking-row flex items-center justify-between p-3 rounded bg-green-50">
-                                    <div class="flex items-center space-x-3">
-                                        <span class="font-bold text-green-600 text-lg w-8">1</span>
-                                        <div>
-                                            <div class="font-semibold text-gray-800">Almería Capital</div>
-                                            <div class="text-xs text-gray-600">195,389 hab. | Almería</div>
-                                        </div>
-                                    </div>
-                                    <div class="text-right">
-                                        <div class="text-2xl font-bold text-green-600">87</div>
-                                        <div class="text-xs text-gray-600">ITP</div>
-                                    </div>
-                                </div>
-                                <div class="ranking-row flex items-center justify-between p-3 rounded hover:bg-gray-50">
-                                    <div class="flex items-center space-x-3">
-                                        <span class="font-bold text-gray-600 text-lg w-8">2</span>
-                                        <div>
-                                            <div class="font-semibold text-gray-800">Marbella</div>
-                                            <div class="text-xs text-gray-600">147,958 hab. | Málaga</div>
-                                        </div>
-                                    </div>
-                                    <div class="text-right">
-                                        <div class="text-2xl font-bold text-green-600">84</div>
-                                        <div class="text-xs text-gray-600">ITP</div>
-                                    </div>
-                                </div>
-                                <div class="ranking-row flex items-center justify-between p-3 rounded hover:bg-gray-50">
-                                    <div class="flex items-center space-x-3">
-                                        <span class="font-bold text-gray-600 text-lg w-8">3</span>
-                                        <div>
-                                            <div class="font-semibold text-gray-800">Úbeda</div>
-                                            <div class="text-xs text-gray-600">34,733 hab. | Jaén</div>
-                                        </div>
-                                    </div>
-                                    <div class="text-right">
-                                        <div class="text-2xl font-bold text-green-600">82</div>
-                                        <div class="text-xs text-gray-600">ITP</div>
-                                    </div>
-                                </div>
-                                <div class="ranking-row flex items-center justify-between p-3 rounded hover:bg-gray-50">
-                                    <div class="flex items-center space-x-3">
-                                        <span class="font-bold text-gray-600 w-8">4</span>
-                                        <div>
-                                            <div class="font-semibold text-gray-800">Jerez de la Frontera</div>
-                                            <div class="text-xs text-gray-600">212,801 hab. | Cádiz</div>
-                                        </div>
-                                    </div>
-                                    <div class="text-right">
-                                        <div class="text-xl font-bold text-green-600">79</div>
-                                        <div class="text-xs text-gray-600">ITP</div>
-                                    </div>
-                                </div>
-                                <div class="ranking-row flex items-center justify-between p-3 rounded hover:bg-gray-50">
-                                    <div class="flex items-center space-x-3">
-                                        <span class="font-bold text-gray-600 w-8">5</span>
-                                        <div>
-                                            <div class="font-semibold text-gray-800">Lucena</div>
-                                            <div class="text-xs text-gray-600">42,568 hab. | Córdoba</div>
-                                        </div>
-                                    </div>
-                                    <div class="text-right">
-                                        <div class="text-xl font-bold text-green-600">76</div>
-                                        <div class="text-xs text-gray-600">ITP</div>
-                                    </div>
-                                </div>
-                                <div class="text-sm text-gray-500 mt-3 pt-3 border-t">6. Ronda (75) | 7. Antequera (74) | 8. Linares (72) | 9. Motril (71) | 10. Lepe (70)</div>
-                            </div>
-                        </div>
-
-                        <!-- Top 10 Peores -->
-                        <div class="bg-white rounded-lg p-6 border-2 border-red-200">
-                            <h3 class="text-xl font-bold text-red-700 mb-4">⚠️ Top 10 - Menor Transparencia</h3>
-                            <div class="space-y-2">
-                                <div class="ranking-row flex items-center justify-between p-3 rounded bg-red-50">
-                                    <div class="flex items-center space-x-3">
-                                        <span class="font-bold text-red-600 text-lg w-8">1</span>
-                                        <div>
-                                            <div class="font-semibold text-gray-800">Municipio A*</div>
-                                            <div class="text-xs text-gray-600">8,234 hab. | Sevilla</div>
-                                        </div>
-                                    </div>
-                                    <div class="text-right">
-                                        <div class="text-2xl font-bold text-red-600">18</div>
-                                        <div class="text-xs text-gray-600">ITP</div>
-                                    </div>
-                                </div>
-                                <div class="ranking-row flex items-center justify-between p-3 rounded hover:bg-gray-50">
-                                    <div class="flex items-center space-x-3">
-                                        <span class="font-bold text-gray-600 text-lg w-8">2</span>
-                                        <div>
-                                            <div class="font-semibold text-gray-800">Municipio B*</div>
-                                            <div class="text-xs text-gray-600">12,456 hab. | Granada</div>
-                                        </div>
-                                    </div>
-                                    <div class="text-right">
-                                        <div class="text-2xl font-bold text-red-600">22</div>
-                                        <div class="text-xs text-gray-600">ITP</div>
-                                    </div>
-                                </div>
-                                <div class="ranking-row flex items-center justify-between p-3 rounded hover:bg-gray-50">
-                                    <div class="flex items-center space-x-3">
-                                        <span class="font-bold text-gray-600 text-lg w-8">3</span>
-                                        <div>
-                                            <div class="font-semibold text-gray-800">Municipio C*</div>
-                                            <div class="text-xs text-gray-600">5,678 hab. | Córdoba</div>
-                                        </div>
-                                    </div>
-                                    <div class="text-right">
-                                        <div class="text-2xl font-bold text-red-600">25</div>
-                                        <div class="text-xs text-gray-600">ITP</div>
-                                    </div>
-                                </div>
-                                <div class="text-sm text-gray-500 mt-3 pt-3 border-t">4-10. Otros municipios con ITP < 30 bajo investigación legal</div>
-                            </div>
-                            <div class="mt-4 bg-yellow-50 border border-yellow-300 rounded p-3">
-                                <p class="text-xs text-gray-700"><strong>*Nota legal:</strong> Municipios anonimizados por procesos judiciales abiertos (Art. 24 CE - presunción inocencia). Datos disponibles previa solicitud justificada.</p>
-                            </div>
-                        </div>
-                    </div>
-
-                    <div class="mt-6 bg-white rounded-lg p-6">
-                        <h3 class="text-lg font-bold text-gray-800 mb-4">📊 Distribución por Rangos ITP</h3>
-                        <div class="grid grid-cols-4 gap-4 text-center">
-                            <div class="p-4 bg-green-50 rounded-lg">
-                                <div class="text-3xl font-bold text-green-600">23</div>
-                                <div class="text-sm text-gray-600">Excelente (>70)</div>
-                            </div>
-                            <div class="p-4 bg-blue-50 rounded-lg">
-                                <div class="text-3xl font-bold text-blue-600">87</div>
-                                <div class="text-sm text-gray-600">Bueno (50-70)</div>
-                            </div>
-                            <div class="p-4 bg-orange-50 rounded-lg">
-                                <div class="text-3xl font-bold text-orange-600">134</div>
-                                <div class="text-sm text-gray-600">Mejorable (30-50)</div>
-                            </div>
-                            <div class="p-4 bg-red-50 rounded-lg">
-                                <div class="text-3xl font-bold text-red-600">68</div>
-                                <div class="text-sm text-gray-600">Deficiente (<30)</div>
-                            </div>
-                        </div>
-                    </div>
-                </section>
-
-                <!-- Análisis de Empresas Adjudicatarias -->
-                <section id="empresas" class="glass-effect rounded-xl p-8 shadow-lg">
-                    <h2 class="text-3xl font-bold text-gray-800 mb-6">🏢 Top Empresas Adjudicatarias</h2>
-                    
-                    <div class="mb-6 bg-yellow-50 border-l-4 border-yellow-500 p-4 rounded">
-                        <p class="text-sm text-gray-700"><strong>⚠️ Análisis de recurrencia:</strong> Empresas con alta concentración de adjudicaciones en múltiples municipios. Esto no implica ilegalidad per se, pero señala puntos de atención para auditorías.</p>
-                    </div>
-
-                    <div class="bg-white rounded-lg overflow-hidden shadow">
-                        <table class="w-full">
-                            <thead class="bg-gray-100">
-                                <tr>
-                                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-700 uppercase tracking-wider">#</th>
-                                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-700 uppercase tracking-wider">Empresa</th>
-                                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-700 uppercase tracking-wider">Sector</th>
-                                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-700 uppercase tracking-wider">Contratos</th>
-                                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-700 uppercase tracking-wider">Importe Total</th>
-                                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-700 uppercase tracking-wider">Municipios</th>
-                                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-700 uppercase tracking-wider">% Adjud.</th>
-                                </tr>
-                            </thead>
-                            <tbody class="bg-white divide-y divide-gray-200">
-                                <tr class="hover:bg-gray-50">
-                                    <td class="px-6 py-4 whitespace-nowrap text-sm font-bold text-gray-900">1</td>
-                                    <td class="px-6 py-4 whitespace-nowrap">
-                                        <div class="text-sm font-medium text-gray-900">Construcciones del Sur S.L.</div>
-                                        <div class="text-xs text-gray-500">CIF: B12345678</div>
-                                    </td>
-                                    <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-600">Obra Civil</td>
-                                    <td class="px-6 py-4 whitespace-nowrap text-sm font-semibold text-gray-900">487</td>
-                                    <td class="px-6 py-4 whitespace-nowrap text-sm font-semibold text-green-600">€24.8M</td>
-                                    <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-600">67</td>
-                                    <td class="px-6 py-4 whitespace-nowrap">
-                                        <span class="px-2 py-1 text-xs font-semibold rounded-full bg-orange-100 text-orange-800">67.3%</span>
-                                    </td>
-                                </tr>
-                                <tr class="hover:bg-gray-50">
-                                    <td class="px-6 py-4 whitespace-nowrap text-sm font-bold text-gray-900">2</td>
-                                    <td class="px-6 py-4 whitespace-nowrap">
-                                        <div class="text-sm font-medium text-gray-900">Servicios Integrales Andalucía S.A.</div>
-                                        <div class="text-xs text-gray-500">CIF: A87654321</div>
-                                    </td>
-                                    <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-600">Limpieza/Mantenimiento</td>
-                                    <td class="px-6 py-4 whitespace-nowrap text-sm font-semibold text-gray-900">412</td>
-                                    <td class="px-6 py-4 whitespace-nowrap text-sm font-semibold text-green-600">€18.2M</td>
-                                    <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-600">89</td>
-                                    <td class="px-6 py-4 whitespace-nowrap">
-                                        <span class="px-2 py-1 text-xs font-semibold rounded-full bg-red-100 text-red-800">78.1%</span>
-                                    </td>
-                                </tr>
-                                <tr class="hover:bg-gray-50">
-                                    <td class="px-6 py-4 whitespace-nowrap text-sm font-bold text-gray-900">3</td>
-                                    <td class="px-6 py-4 whitespace-nowrap">
-                                        <div class="text-sm font-medium text-gray-900">Consultoría y Gestión Pública S.L.</div>
-                                        <div class="text-xs text-gray-500">CIF: B23456789</div>
-                                    </td>
-                                    <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-600">Consultoría</td>
-                                    <td class="px-6 py-4 whitespace-nowrap text-sm font-semibold text-gray-900">356</td>
-                                    <td class="px-6 py-4 whitespace-nowrap text-sm font-semibold text-green-600">€15.7M</td>
-                                    <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-600">54</td>
-                                    <td class="px-6 py-4 whitespace-nowrap">
-                                        <span class="px-2 py-1 text-xs font-semibold rounded-full bg-red-100 text-red-800">82.4%</span>
-                                    </td>
-                                </tr>
-                                <tr class="hover:bg-gray-50">
-                                    <td class="px-6 py-4 whitespace-nowrap text-sm font-bold text-gray-900">4</td>
-                                    <td class="px-6 py-4 whitespace-nowrap">
-                                        <div class="text-sm font-medium text-gray-900">Tecnología Municipal Avanzada S.L.</div>
-                                        <div class="text-xs text-gray-500">CIF: B34567890</div>
-                                    </td>
-                                    <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-600">TIC/Software</td>
-                                    <td class="px-6 py-4 whitespace-nowrap text-sm font-semibold text-gray-900">289</td>
-                                    <td class="px-6 py-4 whitespace-nowrap text-sm font-semibold text-green-600">€12.4M</td>
-                                    <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-600">43</td>
-                                    <td class="px-6 py-4 whitespace-nowrap">
-                                        <span class="px-2 py-1 text-xs font-semibold rounded-full bg-orange-100 text-orange-800">71.2%</span>
-                                    </td>
-                                </tr>
-                                <tr class="hover:bg-gray-50">
-                                    <td class="px-6 py-4 whitespace-nowrap text-sm font-bold text-gray-900">5</td>
-                                    <td class="px-6 py-4 whitespace-nowrap">
-                                        <div class="text-sm font-medium text-gray-900">Eventos y Protocolo Andaluz S.A.</div>
-                                        <div class="text-xs text-gray-500">CIF: A45678901</div>
-                                    </td>
-                                    <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-600">Eventos</td>
-                                    <td class="px-6 py-4 whitespace-nowrap text-sm font-semibold text-gray-900">267</td>
-                                    <td class="px-6 py-4 whitespace-nowrap text-sm font-semibold text-green-600">€9.8M</td>
-                                    <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-600">78</td>
-                                    <td class="px-6 py-4 whitespace-nowrap">
-                                        <span class="px-2 py-1 text-xs font-semibold rounded-full bg-orange-100 text-orange-800">64.7%</span>
-                                    </td>
-                                </tr>
-                            </tbody>
-                        </table>
-                    </div>
-
-                    <div class="mt-6 grid md:grid-cols-2 gap-6">
-                        <div class="bg-white rounded-lg p-6 border">
-                            <h4 class="font-bold text-gray-800 mb-4">🔍 Patrones Detectados</h4>
-                            <ul class="space-y-2 text-sm text-gray-700">
-                                <li class="flex items-start space-x-2">
-                                    <span class="text-red-600">●</span>
-                                    <span><strong>Concentración geográfica:</strong> 5 empresas acumulan el 43% del gasto en limpieza en Sevilla provincia</span>
-                                </li>
-                                <li class="flex items-start space-x-2">
-                                    <span class="text-orange-600">●</span>
-                                    <span><strong>Rotación de nombres:</strong> 12 empresas con mismos administradores y domicilio social</span>
-                                </li>
-                                <li class="flex items-start space-x-2">
-                                    <span class="text-yellow-600">●</span>
-                                    <span><strong>Precios uniformes:</strong> Ofertas idénticas en licitaciones distintas (posible colusión)</span>
-                                </li>
-                            </ul>
-                        </div>
-
-                        <div class="bg-white rounded-lg p-6 border">
-                            <h4 class="font-bold text-gray-800 mb-4">📋 Recomendaciones</h4>
-                            <ul class="space-y-2 text-sm text-gray-700">
-                                <li class="flex items-start space-x-2">
-                                    <span class="text-blue-600">✓</span>
-                                    <span>Auditoría independiente de empresas con >70% adjudicaciones</span>
-                                </li>
-                                <li class="flex items-start space-x-2">
-                                    <span class="text-blue-600">✓</span>
-                                    <span>Verificar ausencia de conflictos de interés con cargos públicos</span>
-                                </li>
-                                <li class="flex items-start space-x-2">
-                                    <span class="text-blue-600">✓</span>
-                                    <span>Implementar sistemas de alertas de CNMC para prácticas anticompetitivas</span>
-                                </li>
-                            </ul>
-                        </div>
                     </div>
                 </section>
 
@@ -1018,187 +425,6 @@
                                 </div>
                             </div>
                         </div>
-                    </div>
-                </section>
-
-                <!-- Buscador de Contratos -->
-                <section id="buscador" class="glass-effect rounded-xl p-8 shadow-lg">
-                    <h2 class="text-3xl font-bold text-gray-800 mb-6">🔍 Buscador de Contratos Públicos</h2>
-                    
-                    <div class="bg-white rounded-lg p-6 shadow mb-6">
-                        <div class="grid md:grid-cols-3 gap-4 mb-4">
-                            <div>
-                                <label class="block text-sm font-semibold text-gray-700 mb-2">Municipio</label>
-                                <select id="searchMunicipio" class="w-full px-4 py-2 border-2 border-gray-300 rounded-lg focus:border-blue-500 focus:outline-none">
-                                    <option value="">Todos</option>
-                                    <option value="sevilla">Sevilla</option>
-                                    <option value="malaga">Málaga</option>
-                                    <option value="cadiz">Cádiz</option>
-                                    <option value="granada">Granada</option>
-                                    <option value="cordoba">Córdoba</option>
-                                    <option value="huelva">Huelva</option>
-                                    <option value="jaen">Jaén</option>
-                                    <option value="almeria">Almería</option>
-                                </select>
-                            </div>
-                            <div>
-                                <label class="block text-sm font-semibold text-gray-700 mb-2">Tipo de Contrato</label>
-                                <select id="searchTipo" class="w-full px-4 py-2 border-2 border-gray-300 rounded-lg focus:border-blue-500 focus:outline-none">
-                                    <option value="">Todos</option>
-                                    <option value="obras">Obras</option>
-                                    <option value="servicios">Servicios</option>
-                                    <option value="suministros">Suministros</option>
-                                    <option value="concesion">Concesión</option>
-                                </select>
-                            </div>
-                            <div>
-                                <label class="block text-sm font-semibold text-gray-700 mb-2">Importe mínimo (€)</label>
-                                <input type="number" id="searchImporte" placeholder="15000" class="w-full px-4 py-2 border-2 border-gray-300 rounded-lg focus:border-blue-500 focus:outline-none">
-                            </div>
-                        </div>
-                        
-                        <div class="grid md:grid-cols-3 gap-4 mb-4">
-                            <div>
-                                <label class="block text-sm font-semibold text-gray-700 mb-2">Fecha desde</label>
-                                <input type="date" id="searchFechaDesde" class="w-full px-4 py-2 border-2 border-gray-300 rounded-lg focus:border-blue-500 focus:outline-none">
-                            </div>
-                            <div>
-                                <label class="block text-sm font-semibold text-gray-700 mb-2">Fecha hasta</label>
-                                <input type="date" id="searchFechaHasta" class="w-full px-4 py-2 border-2 border-gray-300 rounded-lg focus:border-blue-500 focus:outline-none">
-                            </div>
-                            <div>
-                                <label class="block text-sm font-semibold text-gray-700 mb-2">Empresa</label>
-                                <input type="text" id="searchEmpresa" placeholder="Nombre o CIF" class="w-full px-4 py-2 border-2 border-gray-300 rounded-lg focus:border-blue-500 focus:outline-none">
-                            </div>
-                        </div>
-                        
-                        <div class="flex items-center space-x-4">
-                            <button onclick="searchContracts()" class="flex-1 bg-blue-600 text-white px-6 py-3 rounded-lg hover:bg-blue-700 transition font-semibold">
-                                🔍 Buscar Contratos
-                            </button>
-                            <button onclick="resetSearch()" class="px-6 py-3 bg-gray-200 text-gray-700 rounded-lg hover:bg-gray-300 transition font-semibold">
-                                Limpiar
-                            </button>
-                            <button onclick="exportSearch()" class="px-6 py-3 bg-green-600 text-white rounded-lg hover:bg-green-700 transition font-semibold">
-                                📥 Exportar
-                            </button>
-                        </div>
-                    </div>
-
-                    <div id="searchResults" class="bg-white rounded-lg p-6 shadow">
-                        <p class="text-gray-500 text-center py-8">Realice una búsqueda para ver resultados</p>
-                    </div>
-
-                    <div class="mt-6 bg-blue-50 border-l-4 border-blue-600 p-4 rounded">
-                        <h4 class="font-semibold text-gray-800 mb-2">💡 Acceso a Plataformas Oficiales</h4>
-                        <div class="grid md:grid-cols-2 gap-3 text-sm">
-                            <a href="https://contrataciondelestado.es" target="_blank" class="flex items-center space-x-2 text-blue-600 hover:underline">
-                                <span>→</span>
-                                <span>Plataforma de Contratación del Estado</span>
-                            </a>
-                            <a href="https://www.juntadeandalucia.es/organismos/perfildelcontratante.html" target="_blank" class="flex items-center space-x-2 text-blue-600 hover:underline">
-                                <span>→</span>
-                                <span>Perfil del Contratante - Junta de Andalucía</span>
-                            </a>
-                        </div>
-                    </div>
-                </section>
-
-                <!-- Calculadora de Impacto -->
-                <section id="calculadora" class="glass-effect rounded-xl p-8 shadow-lg">
-                    <h2 class="text-3xl font-bold text-gray-800 mb-6">🧮 Calculadora de Impacto Ciudadano</h2>
-                    
-                    <div class="bg-gradient-to-br from-purple-50 to-blue-50 rounded-lg p-6 mb-6">
-                        <p class="text-gray-700 mb-4"><strong>¿Qué podríamos haber financiado con los fondos irregulares?</strong></p>
-                        <p class="text-sm text-gray-600">Los €42.8M detectados en irregularidades equivalen a...</p>
-                    </div>
-
-                    <div class="grid md:grid-cols-2 lg:grid-cols-4 gap-4 mb-8">
-                        <div class="bg-white rounded-lg p-6 shadow-lg border-l-4 border-blue-600">
-                            <div class="text-4xl mb-2">🏥</div>
-                            <div class="text-3xl font-bold text-blue-600">28</div>
-                            <div class="text-sm text-gray-600 mt-2">Centros de Salud completamente equipados</div>
-                            <div class="text-xs text-gray-500 mt-1">(€1.5M por centro)</div>
-                        </div>
-                        
-                        <div class="bg-white rounded-lg p-6 shadow-lg border-l-4 border-green-600">
-                            <div class="text-4xl mb-2">🏫</div>
-                            <div class="text-3xl font-bold text-green-600">85</div>
-                            <div class="text-sm text-gray-600 mt-2">Aulas escolares renovadas con tecnología</div>
-                            <div class="text-xs text-gray-500 mt-1">(€500K por aula)</div>
-                        </div>
-                        
-                        <div class="bg-white rounded-lg p-6 shadow-lg border-l-4 border-orange-600">
-                            <div class="text-4xl mb-2">🚌</div>
-                            <div class="text-3xl font-bold text-orange-600">142</div>
-                            <div class="text-sm text-gray-600 mt-2">Autobuses eléctricos municipales</div>
-                            <div class="text-xs text-gray-500 mt-1">(€300K por unidad)</div>
-                        </div>
-                        
-                        <div class="bg-white rounded-lg p-6 shadow-lg border-l-4 border-purple-600">
-                            <div class="text-4xl mb-2">👥</div>
-                            <div class="text-3xl font-bold text-purple-600">2,140</div>
-                            <div class="text-sm text-gray-600 mt-2">Becas universitarias completas</div>
-                            <div class="text-xs text-gray-500 mt-1">(€20K por 4 años)</div>
-                        </div>
-                    </div>
-
-                    <div class="bg-white rounded-lg p-6 shadow">
-                        <h3 class="text-xl font-bold text-gray-800 mb-4">Calculadora Personalizada</h3>
-                        <div class="grid md:grid-cols-2 gap-6">
-                            <div>
-                                <label class="block text-sm font-semibold text-gray-700 mb-2">Importe irregular detectado (€)</label>
-                                <input type="number" id="calcImporte" value="42800000" class="w-full px-4 py-2 border-2 border-gray-300 rounded-lg focus:border-blue-500 focus:outline-none">
-                                
-                                <label class="block text-sm font-semibold text-gray-700 mb-2 mt-4">Población afectada (hab.)</label>
-                                <input type="number" id="calcPoblacion" value="8472407" placeholder="Andalucía: 8.472.407" class="w-full px-4 py-2 border-2 border-gray-300 rounded-lg focus:border-blue-500 focus:outline-none">
-                                
-                                <button onclick="calculateImpact()" class="w-full mt-4 bg-purple-600 text-white px-6 py-3 rounded-lg hover:bg-purple-700 transition font-semibold">
-                                    Calcular Impacto
-                                </button>
-                            </div>
-                            
-                            <div id="calcResults" class="bg-gray-50 rounded-lg p-6">
-                                <h4 class="font-bold text-gray-800 mb-4">Resultados</h4>
-                                <div class="space-y-3">
-                                    <div class="flex justify-between items-center p-3 bg-white rounded">
-                                        <span class="text-sm text-gray-600">Por habitante</span>
-                                        <span class="text-lg font-bold text-purple-600" id="perCapita">€5.05</span>
-                                    </div>
-                                    <div class="flex justify-between items-center p-3 bg-white rounded">
-                                        <span class="text-sm text-gray-600">Por familia (4 miembros)</span>
-                                        <span class="text-lg font-bold text-purple-600" id="perFamily">€20.20</span>
-                                    </div>
-                                    <div class="flex justify-between items-center p-3 bg-white rounded">
-                                        <span class="text-sm text-gray-600">Equiv. sueldos anuales</span>
-                                        <span class="text-lg font-bold text-purple-600" id="salaries">1,547</span>
-                                    </div>
-                                    <div class="flex justify-between items-center p-3 bg-white rounded">
-                                        <span class="text-sm text-gray-600">% presupuesto andaluz</span>
-                                        <span class="text-lg font-bold text-purple-600" id="budgetPercent">0.12%</span>
-                                    </div>
-                                </div>
-                            </div>
-                        </div>
-                    </div>
-
-                    <div class="mt-6 bg-red-50 border-l-4 border-red-600 p-6 rounded">
-                        <h4 class="font-bold text-gray-800 mb-3">⚠️ Coste de Oportunidad</h4>
-                        <p class="text-sm text-gray-700 mb-3">Los fondos detectados como irregulares representan:</p>
-                        <ul class="space-y-2 text-sm text-gray-700">
-                            <li class="flex items-start space-x-2">
-                                <span class="text-red-600 font-bold">•</span>
-                                <span>El <strong>100% del presupuesto anual</strong> de 8 municipios medianos (5.000-10.000 hab.)</span>
-                            </li>
-                            <li class="flex items-start space-x-2">
-                                <span class="text-red-600 font-bold">•</span>
-                                <span>El <strong>sueldo bruto anual de 1,547 profesores</strong> de educación pública</span>
-                            </li>
-                            <li class="flex items-start space-x-2">
-                                <span class="text-red-600 font-bold">•</span>
-                                <span>El <strong>coste de 12,8 millones de comidas</strong> en comedores escolares</span>
-                            </li>
-                        </ul>
                     </div>
                 </section>
 
@@ -1487,139 +713,6 @@
                     </div>
                 </section>
 
-                <!-- Herramientas Prácticas -->
-                <section id="herramientas" class="glass-effect rounded-xl p-8 shadow-lg">
-                    <h2 class="text-3xl font-bold text-gray-800 mb-6">🛠️ Kit de Herramientas Ciudadanas</h2>
-                    
-                    <div class="grid md:grid-cols-2 gap-6">
-                        <!-- Generador de Denuncias -->
-                        <div class="bg-white rounded-lg p-6 shadow-lg border-t-4 border-blue-600">
-                            <div class="text-4xl mb-3">📝</div>
-                            <h3 class="text-xl font-bold text-gray-800 mb-3">Generador de Denuncias</h3>
-                            <p class="text-gray-600 mb-4">Plantilla automatizada para presentar denuncia ante Fiscalía Anticorrupción</p>
-                            <ul class="text-sm text-gray-600 space-y-2 mb-4">
-                                <li>✓ Formato legal correcto</li>
-                                <li>✓ Referencias normativas incluidas</li>
-                                <li>✓ Checklist de documentación</li>
-                                <li>✓ Export PDF firmable</li>
-                            </ul>
-                            <button onclick="openModal('denunciaGenerator')" class="w-full bg-blue-600 text-white px-4 py-3 rounded-lg hover:bg-blue-700 transition font-semibold">
-                                Generar Denuncia
-                            </button>
-                        </div>
-
-                        <!-- Modelo de Petición UE -->
-                        <div class="bg-white rounded-lg p-6 shadow-lg border-t-4 border-purple-600">
-                            <div class="text-4xl mb-3">🇪🇺</div>
-                            <h3 class="text-xl font-bold text-gray-800 mb-3">Petición al Parlamento Europeo</h3>
-                            <p class="text-gray-600 mb-4">Formulario para presentar petición ante el Comité de Peticiones</p>
-                            <ul class="text-sm text-gray-600 space-y-2 mb-4">
-                                <li>✓ Formato oficial UE</li>
-                                <li>✓ Traducción automática</li>
-                                <li>✓ Articulado TFUE</li>
-                                <li>✓ Envío directo online</li>
-                            </ul>
-                            <button onclick="openModal('peticionUE')" class="w-full bg-purple-600 text-white px-4 py-3 rounded-lg hover:bg-purple-700 transition font-semibold">
-                                Crear Petición
-                            </button>
-                        </div>
-
-                        <!-- Solicitud Transparencia -->
-                        <div class="bg-white rounded-lg p-6 shadow-lg border-t-4 border-green-600">
-                            <div class="text-4xl mb-3">📄</div>
-                            <h3 class="text-xl font-bold text-gray-800 mb-3">Solicitud de Transparencia</h3>
-                            <p class="text-gray-600 mb-4">Modelo para solicitar información pública (Ley 19/2013)</p>
-                            <ul class="text-sm text-gray-600 space-y-2 mb-4">
-                                <li>✓ Plantilla Ley 19/2013</li>
-                                <li>✓ Plazos legales indicados</li>
-                                <li>✓ Recursos disponibles</li>
-                                <li>✓ Seguimiento de solicitud</li>
-                            </ul>
-                            <button onclick="openModal('solicitudTransparencia')" class="w-full bg-green-600 text-white px-4 py-3 rounded-lg hover:bg-green-700 transition font-semibold">
-                                Solicitar Información
-                            </button>
-                        </div>
-
-                        <!-- Calculadora de Plazos -->
-                        <div class="bg-white rounded-lg p-6 shadow-lg border-t-4 border-orange-600">
-                            <div class="text-4xl mb-3">⏱️</div>
-                            <h3 class="text-xl font-bold text-gray-800 mb-3">Calculadora de Plazos Legales</h3>
-                            <p class="text-gray-600 mb-4">Calcula plazos procesales y administrativos automáticamente</p>
-                            <ul class="text-sm text-gray-600 space-y-2 mb-4">
-                                <li>✓ Recursos contencioso-administrativos</li>
-                                <li>✓ Plazos denuncias penales</li>
-                                <li>✓ Alertas por calendario</li>
-                                <li>✓ Excluye inhábiles</li>
-                            </ul>
-                            <button onclick="openModal('calculadoraPlazos')" class="w-full bg-orange-600 text-white px-4 py-3 rounded-lg hover:bg-orange-700 transition font-semibold">
-                                Calcular Plazos
-                            </button>
-                        </div>
-
-                        <!-- Verificador de Contratos -->
-                        <div class="bg-white rounded-lg p-6 shadow-lg border-t-4 border-red-600">
-                            <div class="text-4xl mb-3">🔍</div>
-                            <h3 class="text-xl font-bold text-gray-800 mb-3">Verificador de Legalidad</h3>
-                            <p class="text-gray-600 mb-4">Analiza si un contrato cumple requisitos LCSP</p>
-                            <ul class="text-sm text-gray-600 space-y-2 mb-4">
-                                <li>✓ Checklist LCSP completo</li>
-                                <li>✓ Detección de red flags</li>
-                                <li>✓ Informe de conformidad</li>
-                                <li>✓ Recomendaciones legales</li>
-                            </ul>
-                            <button onclick="openModal('verificadorContrato')" class="w-full bg-red-600 text-white px-4 py-3 rounded-lg hover:bg-red-700 transition font-semibold">
-                                Verificar Contrato
-                            </button>
-                        </div>
-
-                        <!-- Directorio de Contactos -->
-                        <div class="bg-white rounded-lg p-6 shadow-lg border-t-4 border-indigo-600">
-                            <div class="text-4xl mb-3">📞</div>
-                            <h3 class="text-xl font-bold text-gray-800 mb-3">Directorio de Contactos</h3>
-                            <p class="text-gray-600 mb-4">Listado completo de organismos y vías de denuncia</p>
-                            <ul class="text-sm text-gray-600 space-y-2 mb-4">
-                                <li>✓ Fiscalías por provincia</li>
-                                <li>✓ Juzgados de Instrucción</li>
-                                <li>✓ Defensor del Pueblo</li>
-                                <li>✓ Organismos europeos</li>
-                            </ul>
-                            <button onclick="openModal('directorio')" class="w-full bg-indigo-600 text-white px-4 py-3 rounded-lg hover:bg-indigo-700 transition font-semibold">
-                                Ver Directorio
-                            </button>
-                        </div>
-                    </div>
-
-                    <div class="mt-8 bg-blue-50 border-l-4 border-blue-600 p-6 rounded">
-                        <h4 class="font-bold text-gray-800 mb-3">📚 Biblioteca de Recursos Descargables</h4>
-                        <div class="grid md:grid-cols-3 gap-3">
-                            <a href="#" class="flex items-center space-x-2 text-blue-600 hover:underline text-sm">
-                                <span>📄</span>
-                                <span>Guía completa LCSP (PDF)</span>
-                            </a>
-                            <a href="#" class="flex items-center space-x-2 text-blue-600 hover:underline text-sm">
-                                <span>📄</span>
-                                <span>Ley 19/2013 Transparencia</span>
-                            </a>
-                            <a href="#" class="flex items-center space-x-2 text-blue-600 hover:underline text-sm">
-                                <span>📄</span>
-                                <span>Código Penal (Arts. relevantes)</span>
-                            </a>
-                            <a href="#" class="flex items-center space-x-2 text-blue-600 hover:underline text-sm">
-                                <span>📄</span>
-                                <span>Jurisprudencia TJUE</span>
-                            </a>
-                            <a href="#" class="flex items-center space-x-2 text-blue-600 hover:underline text-sm">
-                                <span>📄</span>
-                                <span>Manual participación ciudadana</span>
-                            </a>
-                            <a href="#" class="flex items-center space-x-2 text-blue-600 hover:underline text-sm">
-                                <span>📄</span>
-                                <span>Casos de éxito internacionales</span>
-                            </a>
-                        </div>
-                    </div>
-                </section>
-
                 <!-- Plataforma Tecnológica -->
                 <section id="tecnologia" class="glass-effect rounded-xl p-8 shadow-lg">
                     <h2 class="text-3xl font-bold text-gray-800 mb-6">🛡️ Sistema de Protección Tecnológica</h2>
@@ -1721,6 +814,136 @@
                             <li>• <strong>eIDAS (UE 910/2014):</strong> Identificación electrónica y servicios de confianza</li>
                             <li>• <strong>Directiva NIS2:</strong> Seguridad de redes y sistemas de información</li>
                         </ul>
+                    </div>
+                </section>
+
+                <!-- Formulario de Denuncias Ciudadanas -->
+                <section id="denuncias" class="glass-effect rounded-xl p-8 shadow-lg">
+                    <h2 class="text-3xl font-bold text-gray-800 mb-6">🚨 Formulario de Denuncias Ciudadanas</h2>
+                    <p class="text-gray-600 mb-6">Envía información anónima o identificada sobre irregularidades en tu municipio. Los datos se enviarán cifrados y serán verificados por nuestro equipo.</p>
+                    
+                    <form action="https://formsubmit.co/observatorio.transparencia.andalucia@gmail.com" method="POST" class="space-y-6">
+                        <!-- Campos ocultos para FormSubmit -->
+                        <input type="hidden" name="_subject" value="NUEVA DENUNCIA - Observatorio Andaluz">
+                        <input type="hidden" name="_template" value="box">
+                        <input type="hidden" name="_captcha" value="false">
+                        
+                        <div class="grid md:grid-cols-2 gap-6">
+                            <div>
+                                <label class="block text-sm font-semibold text-gray-700 mb-2">Provincia *</label>
+                                <select name="provincia" required class="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500">
+                                    <option value="">Selecciona provincia</option>
+                                    <option value="Almería">Almería</option>
+                                    <option value="Cádiz">Cádiz</option>
+                                    <option value="Córdoba">Córdoba</option>
+                                    <option value="Granada">Granada</option>
+                                    <option value="Huelva">Huelva</option>
+                                    <option value="Jaén">Jaén</option>
+                                    <option value="Málaga">Málaga</option>
+                                    <option value="Sevilla">Sevilla</option>
+                                </select>
+                            </div>
+                            
+                            <div>
+                                <label class="block text-sm font-semibold text-gray-700 mb-2">Municipio *</label>
+                                <input type="text" name="municipio" required placeholder="Ej: Cádiz, Algeciras..." class="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500">
+                            </div>
+                        </div>
+                        
+                        <div class="grid md:grid-cols-2 gap-6">
+                            <div>
+                                <label class="block text-sm font-semibold text-gray-700 mb-2">Tipo de Irregularidad *</label>
+                                <select name="tipo_irregularidad" required class="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500">
+                                    <option value="">Selecciona tipo</option>
+                                    <option value="Opacidad contractual">Opacidad contractual (sin publicidad)</option>
+                                    <option value="Desviación presupuestaria">Desviación presupuestaria</option>
+                                    <option value="Adjudicación express">Adjudicación express (plazos irregulares)</option>
+                                    <option value="Costes ocultos">Costes ocultos no declarados</option>
+                                    <option value="Fraccionamiento">Fraccionamiento irregular de contratos</option>
+                                    <option value="Conflicto de interés">Conflicto de interés</option>
+                                    <option value="Sobrecostes">Sobrecostes injustificados</option>
+                                    <option value="Otra">Otra irregularidad</option>
+                                </select>
+                            </div>
+                            
+                            <div>
+                                <label class="block text-sm font-semibold text-gray-700 mb-2">Importe Aproximado (€)</label>
+                                <input type="number" name="importe" placeholder="Ej: 15000" class="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500">
+                            </div>
+                        </div>
+                        
+                        <div>
+                            <label class="block text-sm font-semibold text-gray-700 mb-2">Descripción Detallada *</label>
+                            <textarea name="descripcion" required rows="6" placeholder="Describe la irregularidad con el máximo detalle posible: fechas, nombres, contratos, pruebas..." class="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"></textarea>
+                            <p class="text-xs text-gray-500 mt-1">Cuanta más información proporciones, mejor podremos verificar la denuncia.</p>
+                        </div>
+                        
+                        <div>
+                            <label class="block text-sm font-semibold text-gray-700 mb-2">Pruebas Documentales (opcional)</label>
+                            <input type="file" name="pruebas" multiple accept=".pdf,.jpg,.jpeg,.png,.doc,.docx" class="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500">
+                            <p class="text-xs text-gray-500 mt-1">Puedes subir facturas, contratos, emails, capturas, etc. Máximo 10MB por archivo.</p>
+                        </div>
+                        
+                        <div class="grid md:grid-cols-2 gap-6">
+                            <div>
+                                <label class="block text-sm font-semibold text-gray-700 mb-2">Tu Email (opcional, para seguimiento)</label>
+                                <input type="email" name="email" placeholder="anonimo@ejemplo.com" class="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500">
+                                <p class="text-xs text-gray-500 mt-1">Si no proporcionas email, la denuncia será totalmente anónima.</p>
+                            </div>
+                            
+                            <div>
+                                <label class="block text-sm font-semibold text-gray-700 mb-2">Teléfono de Contacto (opcional)</label>
+                                <input type="tel" name="telefono" placeholder="Opcional para urgencias" class="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500">
+                            </div>
+                        </div>
+                        
+                        <div class="bg-yellow-50 border-l-4 border-yellow-400 p-4 rounded">
+                            <div class="flex items-start">
+                                <div class="text-yellow-700 mr-3">⚠️</div>
+                                <div>
+                                    <p class="text-sm font-semibold text-yellow-700">Información Legal</p>
+                                    <p class="text-xs text-yellow-600">Al enviar esta denuncia declaras que la información es veraz y entiendes que podrías ser requerido/a como testigo en procedimientos judiciales. Las denuncias falsas están penadas por el Código Penal.</p>
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <div class="flex items-center space-x-3">
+                            <input type="checkbox" name="legal" required class="w-5 h-5 text-blue-600">
+                            <label class="text-sm text-gray-700">* Declaro que la información proporcionada es veraz y acepto las condiciones legales</label>
+                        </div>
+                        
+                        <button type="submit" class="w-full bg-red-600 text-white py-4 px-6 rounded-lg hover:bg-red-700 transition font-bold text-lg shadow-lg">
+                            🚨 ENVIAR DENUNCIA ANÓNIMA
+                        </button>
+                        
+                        <p class="text-xs text-center text-gray-500">Los datos se envían cifrados mediante conexión segura. Puedes usar Tor Browser para máximo anonimato.</p>
+                    </form>
+                </section>
+
+                <!-- Datos Específicos por Municipios -->
+                <section id="municipios-detalle" class="glass-effect rounded-xl p-8 shadow-lg">
+                    <h2 class="text-3xl font-bold text-gray-800 mb-6">🏘️ Datos Específicos por Municipios</h2>
+                    
+                    <div class="mb-6">
+                        <input type="text" id="municipioSearch" placeholder="🔍 Busca tu municipio..." class="w-full px-4 py-3 border border-gray-300 rounded-lg search-box">
+                    </div>
+                    
+                    <div class="data-table">
+                        <table class="w-full text-sm">
+                            <thead class="bg-gray-50 sticky top-0">
+                                <tr>
+                                    <th class="text-left p-3 font-semibold">Municipio</th>
+                                    <th class="text-left p-3 font-semibold">Provincia</th>
+                                    <th class="text-left p-3 font-semibold">Irregularidades</th>
+                                    <th class="text-left p-3 font-semibold">Importe (€)</th>
+                                    <th class="text-left p-3 font-semibold">Última Act.</th>
+                                    <th class="text-left p-3 font-semibold">Acción</th>
+                                </tr>
+                            </thead>
+                            <tbody id="municipiosTable">
+                                <!-- Se llenará dinámicamente -->
+                            </tbody>
+                        </table>
                     </div>
                 </section>
 
@@ -2111,348 +1334,6 @@
             console.warn('2. Haga una copia en formato PDF');
             console.warn('3. Considere impresión física para evidencia legal');
         }
-        
-        // Funciones de búsqueda y filtrado
-        function searchContracts() {
-            const municipio = document.getElementById('searchMunicipio').value;
-            const tipo = document.getElementById('searchTipo').value;
-            const importe = document.getElementById('searchImporte').value;
-            const empresa = document.getElementById('searchEmpresa').value;
-            
-            const resultsDiv = document.getElementById('searchResults');
-            resultsDiv.innerHTML = `
-                <div class="text-center py-8">
-                    <div class="inline-block animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mb-4"></div>
-                    <p class="text-gray-600">Buscando en base de datos...</p>
-                </div>
-            `;
-            
-            setTimeout(() => {
-                resultsDiv.innerHTML = `
-                    <h3 class="font-bold text-gray-800 mb-4">Resultados de búsqueda: 23 contratos encontrados</h3>
-                    <div class="space-y-3">
-                        <div class="border-l-4 border-blue-600 bg-gray-50 p-4 rounded">
-                            <div class="flex justify-between items-start mb-2">
-                                <div class="font-semibold text-gray-800">Servicios de limpieza edificios municipales</div>
-                                <span class="text-sm bg-blue-100 text-blue-700 px-3 py-1 rounded-full">Servicios</span>
-                            </div>
-                            <div class="grid grid-cols-3 gap-4 text-sm text-gray-600 mb-2">
-                                <div><strong>Municipio:</strong> Sevilla</div>
-                                <div><strong>Importe:</strong> €245,000</div>
-                                <div><strong>Fecha:</strong> 15/03/2024</div>
-                            </div>
-                            <div class="text-sm text-gray-600">
-                                <strong>Adjudicatario:</strong> Servicios Integrales Andalucía S.A.
-                            </div>
-                        </div>
-                        <div class="border-l-4 border-orange-600 bg-gray-50 p-4 rounded">
-                            <div class="flex justify-between items-start mb-2">
-                                <div class="font-semibold text-gray-800">Rehabilitación plaza pública</div>
-                                <span class="text-sm bg-orange-100 text-orange-700 px-3 py-1 rounded-full">Obras</span>
-                            </div>
-                            <div class="grid grid-cols-3 gap-4 text-sm text-gray-600 mb-2">
-                                <div><strong>Municipio:</strong> Málaga</div>
-                                <div><strong>Importe:</strong> €1,200,000</div>
-                                <div><strong>Fecha:</strong> 08/02/2024</div>
-                            </div>
-                            <div class="text-sm text-gray-600">
-                                <strong>Adjudicatario:</strong> Construcciones del Sur S.L.
-                            </div>
-                        </div>
-                    </div>
-                    <div class="mt-4 text-center">
-                        <button class="text-blue-600 hover:text-blue-800 font-semibold">Ver todos los resultados (23) →</button>
-                    </div>
-                `;
-            }, 1500);
-        }
-        
-        function resetSearch() {
-            document.getElementById('searchMunicipio').value = '';
-            document.getElementById('searchTipo').value = '';
-            document.getElementById('searchImporte').value = '';
-            document.getElementById('searchEmpresa').value = '';
-            document.getElementById('searchFechaDesde').value = '';
-            document.getElementById('searchFechaHasta').value = '';
-            document.getElementById('searchResults').innerHTML = '<p class="text-gray-500 text-center py-8">Realice una búsqueda para ver resultados</p>';
-        }
-        
-        function exportSearch() {
-            alert('Exportando resultados en formato CSV...\n\nEsta funcionalidad conectaría con la API real del observatorio.');
-        }
-        
-        // Calculadora de impacto
-        function calculateImpact() {
-            const importe = parseFloat(document.getElementById('calcImporte').value) || 0;
-            const poblacion = parseFloat(document.getElementById('calcPoblacion').value) || 8472407;
-            
-            const perCapita = (importe / poblacion).toFixed(2);
-            const perFamily = (perCapita * 4).toFixed(2);
-            const salaries = Math.floor(importe / 27700); // Salario medio España
-            const budgetPercent = ((importe / 35600000000) * 100).toFixed(2); // Presupuesto Andalucía aprox.
-            
-            document.getElementById('perCapita').textContent = `€${perCapita}`;
-            document.getElementById('perFamily').textContent = `€${perFamily}`;
-            document.getElementById('salaries').textContent = salaries.toLocaleString('es-ES');
-            document.getElementById('budgetPercent').textContent = `${budgetPercent}%`;
-        }
-        
-        // Filtrado de casos
-        function filterCases(category) {
-            const cases = document.querySelectorAll('.case-card');
-            const buttons = document.querySelectorAll('[id^="filter-"]');
-            
-            buttons.forEach(btn => {
-                btn.classList.remove('bg-blue-600', 'text-white', 'font-semibold');
-                btn.classList.add('bg-gray-200');
-            });
-            
-            document.getElementById(`filter-${category}`).classList.add('bg-blue-600', 'text-white', 'font-semibold');
-            document.getElementById(`filter-${category}`).classList.remove('bg-gray-200');
-            
-            cases.forEach(caseCard => {
-                if (category === 'all') {
-                    caseCard.style.display = 'block';
-                } else {
-                    const categories = caseCard.dataset.category.split(' ');
-                    caseCard.style.display = categories.includes(category) ? 'block' : 'none';
-                }
-            });
-        }
-        
-        function loadMoreCases() {
-            alert('Cargando más casos...\n\nEn la versión completa, esto cargaría casos adicionales desde la base de datos.');
-        }
-        
-        function openCaseDetail(caseId) {
-            alert(`Abriendo detalles del caso #${caseId}...\n\nEn la versión completa, mostraría:\n- Expediente completo\n- Cronología detallada\n- Documentos adjuntos\n- Estado procesal actual`);
-        }
-        
-        // Sistema de modales
-        function openModal(modalId) {
-            let modalContent = '';
-            
-            switch(modalId) {
-                case 'contactModal':
-                    modalContent = `
-                        <h2 class="text-2xl font-bold text-gray-800 mb-4">📧 Contactar con OATD</h2>
-                        <form class="space-y-4">
-                            <div>
-                                <label class="block text-sm font-semibold text-gray-700 mb-2">Nombre completo</label>
-                                <input type="text" class="w-full px-4 py-2 border rounded-lg focus:outline-none focus:border-blue-500">
-                            </div>
-                            <div>
-                                <label class="block text-sm font-semibold text-gray-700 mb-2">Email</label>
-                                <input type="email" class="w-full px-4 py-2 border rounded-lg focus:outline-none focus:border-blue-500">
-                            </div>
-                            <div>
-                                <label class="block text-sm font-semibold text-gray-700 mb-2">Asunto</label>
-                                <select class="w-full px-4 py-2 border rounded-lg focus:outline-none focus:border-blue-500">
-                                    <option>Reportar irregularidad</option>
-                                    <option>Solicitar información</option>
-                                    <option>Colaboración</option>
-                                    <option>Prensa</option>
-                                    <option>Otro</option>
-                                </select>
-                            </div>
-                            <div>
-                                <label class="block text-sm font-semibold text-gray-700 mb-2">Mensaje</label>
-                                <textarea rows="4" class="w-full px-4 py-2 border rounded-lg focus:outline-none focus:border-blue-500"></textarea>
-                            </div>
-                            <div class="flex items-center">
-                                <input type="checkbox" class="mr-2">
-                                <label class="text-sm text-gray-600">Acepto la política de privacidad</label>
-                            </div>
-                            <button type="submit" class="w-full bg-blue-600 text-white px-6 py-3 rounded-lg hover:bg-blue-700 transition font-semibold">
-                                Enviar Mensaje
-                            </button>
-                        </form>
-                    `;
-                    break;
-                    
-                case 'reportModal':
-                    modalContent = `
-                        <h2 class="text-2xl font-bold text-gray-800 mb-4">🚨 Reportar Irregularidad</h2>
-                        <div class="bg-yellow-50 border-l-4 border-yellow-500 p-4 mb-4">
-                            <p class="text-sm text-gray-700"><strong>Confidencialidad garantizada:</strong> Su identidad puede mantenerse anónima. Los datos se cifran y protegen según RGPD.</p>
-                        </div>
-                        <form class="space-y-4">
-                            <div>
-                                <label class="block text-sm font-semibold text-gray-700 mb-2">Tipo de irregularidad</label>
-                                <select class="w-full px-4 py-2 border rounded-lg focus:outline-none focus:border-blue-500">
-                                    <option>Contrato irregular</option>
-                                    <option>Desviación de fondos</option>
-                                    <option>Falta de transparencia</option>
-                                    <option>Conflicto de interés</option>
-                                    <option>Subvención irregular</option>
-                                    <option>Otro</option>
-                                </select>
-                            </div>
-                            <div>
-                                <label class="block text-sm font-semibold text-gray-700 mb-2">Provincia</label>
-                                <select class="w-full px-4 py-2 border rounded-lg focus:outline-none focus:border-blue-500">
-                                    <option>Almería</option>
-                                    <option>Cádiz</option>
-                                    <option>Córdoba</option>
-                                    <option>Granada</option>
-                                    <option>Huelva</option>
-                                    <option>Jaén</option>
-                                    <option>Málaga</option>
-                                    <option>Sevilla</option>
-                                </select>
-                            </div>
-                            <div>
-                                <label class="block text-sm font-semibold text-gray-700 mb-2">Municipio</label>
-                                <input type="text" class="w-full px-4 py-2 border rounded-lg focus:outline-none focus:border-blue-500">
-                            </div>
-                            <div>
-                                <label class="block text-sm font-semibold text-gray-700 mb-2">Descripción detallada</label>
-                                <textarea rows="6" placeholder="Incluya: fechas, importes, nombres de empresas, número de expediente si lo conoce..." class="w-full px-4 py-2 border rounded-lg focus:outline-none focus:border-blue-500"></textarea>
-                            </div>
-                            <div>
-                                <label class="block text-sm font-semibold text-gray-700 mb-2">Adjuntar documentación (opcional)</label>
-                                <input type="file" multiple class="w-full px-4 py-2 border rounded-lg">
-                                <p class="text-xs text-gray-500 mt-1">PDF, imágenes, documentos (máx. 10MB)</p>
-                            </div>
-                            <div class="flex items-center">
-                                <input type="checkbox" class="mr-2">
-                                <label class="text-sm text-gray-600">Deseo permanecer anónimo</label>
-                            </div>
-                            <button type="submit" class="w-full bg-red-600 text-white px-6 py-3 rounded-lg hover:bg-red-700 transition font-semibold">
-                                Enviar Reporte Seguro
-                            </button>
-                        </form>
-                    `;
-                    break;
-                    
-                case 'denunciaGenerator':
-                    modalContent = `
-                        <h2 class="text-2xl font-bold text-gray-800 mb-4">📝 Generador de Denuncia a Fiscalía</h2>
-                        <div class="bg-blue-50 border-l-4 border-blue-500 p-4 mb-4">
-                            <p class="text-sm text-gray-700">Esta herramienta genera un documento con formato legal correcto para presentar ante la Fiscalía Anticorrupción.</p>
-                        </div>
-                        <form class="space-y-4">
-                            <div class="grid md:grid-cols-2 gap-4">
-                                <div>
-                                    <label class="block text-sm font-semibold text-gray-700 mb-2">Nombre completo</label>
-                                    <input type="text" class="w-full px-4 py-2 border rounded-lg focus:outline-none focus:border-blue-500">
-                                </div>
-                                <div>
-                                    <label class="block text-sm font-semibold text-gray-700 mb-2">DNI/NIE</label>
-                                    <input type="text" class="w-full px-4 py-2 border rounded-lg focus:outline-none focus:border-blue-500">
-                                </div>
-                            </div>
-                            <div>
-                                <label class="block text-sm font-semibold text-gray-700 mb-2">Hechos denunciados</label>
-                                <textarea rows="6" placeholder="Describa los hechos de forma cronológica y objetiva..." class="w-full px-4 py-2 border rounded-lg focus:outline-none focus:border-blue-500"></textarea>
-                            </div>
-                            <div>
-                                <label class="block text-sm font-semibold text-gray-700 mb-2">Posible delito</label>
-                                <select class="w-full px-4 py-2 border rounded-lg focus:outline-none focus:border-blue-500">
-                                    <option>Prevaricación administrativa (Art. 404 CP)</option>
-                                    <option>Malversación de caudales públicos (Art. 432 CP)</option>
-                                    <option>Fraude (Art. 250 CP)</option>
-                                    <option>Tráfico de influencias (Art. 428 CP)</option>
-                                    <option>Cohecho (Art. 419 CP)</option>
-                                </select>
-                            </div>
-                            <button type="button" onclick="alert('Generando documento PDF...')" class="w-full bg-blue-600 text-white px-6 py-3 rounded-lg hover:bg-blue-700 transition font-semibold">
-                                Generar PDF de Denuncia
-                            </button>
-                        </form>
-                    `;
-                    break;
-                    
-                case 'directorio':
-                    modalContent = `
-                        <h2 class="text-2xl font-bold text-gray-800 mb-4">📞 Directorio de Contactos</h2>
-                        <div class="space-y-4 max-h-96 overflow-y-auto">
-                            <div class="bg-red-50 border-l-4 border-red-600 p-4">
-                                <h3 class="font-bold text-gray-800 mb-2">Fiscalía Anticorrupción</h3>
-                                <p class="text-sm text-gray-600">📧 anticorrupcion@fiscal.es</p>
-                                <p class="text-sm text-gray-600">📞 +34 91 390 28 00</p>
-                                <p class="text-sm text-gray-600">📍 C/ Fortuny, 4 - 28010 Madrid</p>
-                            </div>
-                            
-                            <div class="bg-blue-50 border-l-4 border-blue-600 p-4">
-                                <h3 class="font-bold text-gray-800 mb-2">Cámara de Cuentas de Andalucía</h3>
-                                <p class="text-sm text-gray-600">📧 informacion@ccuentas.es</p>
-                                <p class="text-sm text-gray-600">📞 +34 954 786 600</p>
-                                <p class="text-sm text-gray-600">🌐 www.ccuentas.es</p>
-                            </div>
-                            
-                            <div class="bg-green-50 border-l-4 border-green-600 p-4">
-                                <h3 class="font-bold text-gray-800 mb-2">Defensor del Pueblo Andaluz</h3>
-                                <p class="text-sm text-gray-600">📧 defensor@defensordelpuebloandaluz.es</p>
-                                <p class="text-sm text-gray-600">📞 +34 954 212 121</p>
-                                <p class="text-sm text-gray-600">🌐 www.defensordelpuebloandaluz.es</p>
-                            </div>
-                            
-                            <div class="bg-purple-50 border-l-4 border-purple-600 p-4">
-                                <h3 class="font-bold text-gray-800 mb-2">OLAF - Oficina Antifraude UE</h3>
-                                <p class="text-sm text-gray-600">🌐 ec.europa.eu/anti-fraud/olaf</p>
-                                <p class="text-sm text-gray-600">📧 olaf-info@ec.europa.eu</p>
-                            </div>
-                            
-                            <div class="bg-orange-50 border-l-4 border-orange-600 p-4">
-                                <h3 class="font-bold text-gray-800 mb-2">Transparency International España</h3>
-                                <p class="text-sm text-gray-600">📧 ti@transparencia.org.es</p>
-                                <p class="text-sm text-gray-600">📞 +34 91 770 60 15</p>
-                                <p class="text-sm text-gray-600">🌐 www.transparencia.org.es</p>
-                            </div>
-                        </div>
-                    `;
-                    break;
-                    
-                default:
-                    modalContent = `
-                        <h2 class="text-2xl font-bold text-gray-800 mb-4">Herramienta en Desarrollo</h2>
-                        <p class="text-gray-600">Esta funcionalidad estará disponible próximamente en la versión completa del observatorio.</p>
-                        <p class="text-sm text-gray-500 mt-4">Mientras tanto, puede utilizar las otras herramientas disponibles o contactar con nosotros para más información.</p>
-                    `;
-            }
-            
-            const modal = document.createElement('div');
-            modal.className = 'modal';
-            modal.innerHTML = `
-                <div class="modal-content">
-                    <span class="close" onclick="closeModal(this)">&times;</span>
-                    ${modalContent}
-                </div>
-            `;
-            
-            document.body.appendChild(modal);
-            modal.style.display = 'block';
-            
-            modal.onclick = function(event) {
-                if (event.target === modal) {
-                    closeModal(modal.querySelector('.close'));
-                }
-            };
-        }
-        
-        function closeModal(closeBtn) {
-            const modal = closeBtn.closest('.modal');
-            modal.style.display = 'none';
-            setTimeout(() => modal.remove(), 300);
-        }
-        
-        // Búsqueda global
-        document.addEventListener('DOMContentLoaded', function() {
-            const globalSearch = document.getElementById('globalSearch');
-            if (globalSearch) {
-                globalSearch.addEventListener('input', function(e) {
-                    const query = e.target.value.toLowerCase();
-                    if (query.length > 2) {
-                        console.log('Buscando:', query);
-                        // Aquí se implementaría búsqueda en tiempo real
-                    }
-                });
-            }
-            
-            // Inicializar calculadora con valores por defecto
-            calculateImpact();
-        });
     </script>
 </body>
 </html>
